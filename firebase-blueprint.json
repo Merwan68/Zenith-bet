@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account profile and authentication metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "username": { "type": "string", "description": "Display name or handle", "maxLength": 50 },
+        "avatar": { "type": "string", "description": "Avatar insignia icon", "maxLength": 10 },
+        "vipLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum", "Diamond"] },
+        "role": { "type": "string", "enum": ["player", "admin", "super_admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "username", "role", "createdAt"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "User ledger with isolated main and bonus balances",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "mainBalance": { "type": "number", "description": "Withdrawable main cash balance in ETB" },
+        "bonusBalance": { "type": "number", "description": "Locked or promotional bonus balance in ETB" },
+        "currency": { "type": "string", "enum": ["ETB", "USD"] },
+        "welcomeBonusClaimed": { "type": "boolean", "description": "Idempotency flag to prevent duplicate 250 ETB bonus awards" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "mainBalance", "bonusBalance", "currency", "welcomeBonusClaimed"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Individual credit, debit, or bonus award transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "bonus_award", "bet_placed", "bet_payout"] },
+        "balanceType": { "type": "string", "enum": ["main", "bonus"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["ETB", "USD"] },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed", "cancelled"] },
+        "reference": { "type": "string" },
+        "description": { "type": "string" },
+        "telebirrPhone": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "balanceType", "amount", "currency", "status", "reference", "timestamp"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "User request for Telebirr payout undergoing review and settlement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string", "format": "email" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "balanceType": { "type": "string", "enum": ["main", "bonus"] },
+        "telebirrAccount": { "type": "string", "description": "Validated Ethiopian mobile number" },
+        "accountHolderName": { "type": "string" },
+        "reference": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Completed"] },
+        "reviewedBy": { "type": "string" },
+        "reviewNotes": { "type": "string" },
+        "payoutTxRef": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "amount", "balanceType", "telebirrAccount", "accountHolderName", "reference", "status", "createdAt"]
+    },
+    "DepositRequest": {
+      "title": "DepositRequest",
+      "description": "Player proof of deposit to official cashier Telebirr account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string", "format": "email" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number", "description": "Deposited amount in ETB / Birr" },
+        "senderPhone": { "type": "string", "description": "Player Telebirr phone number" },
+        "receiverPhone": { "type": "string", "description": "Cashier destination Telebirr account" },
+        "transactionCode": { "type": "string", "description": "Telebirr confirmation SMS code" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "bonusApplied": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "amount", "senderPhone", "transactionCode", "status", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and administrative actions ledger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "operatorEmail": { "type": "string" },
+        "operatorRole": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "operatorId", "operatorRole", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profile document keyed by auth UID"
+    },
+    "/wallets/{userId}": {
+      "schema": { "$ref": "Wallet" },
+      "description": "User wallet document with main and bonus balances"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "Transaction" },
+      "description": "Transaction ledger entries keyed by transaction reference"
+    },
+    "/withdrawalRequests/{requestId}": {
+      "schema": { "$ref": "WithdrawalRequest" },
+      "description": "Withdrawal requests undergoing administrative approval"
+    },
+    "/depositRequests/{depositId}": {
+      "schema": { "$ref": "DepositRequest" },
+      "description": "Player proof of deposit to Telebirr cashier undergoing review"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "AuditLog" },
+      "description": "Administrative actions audit stream"
+    }
+  }
+}

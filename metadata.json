@@ -1,0 +1,6 @@
+{
+  "name": "Zenith Sportsbook & Casino",
+  "description": "Premium international sportsbook and online casino platform featuring live odds, comprehensive betting markets, real-time casino games, sandbox Telebirr payments, and administration console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

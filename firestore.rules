@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'merwanabdusomed@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) &&
+        request.resource.data.id == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role == 'player';
+      allow update: if isOwner(userId) &&
+        request.resource.data.id == userId &&
+        request.resource.data.role == resource.data.role; // Prevent self-role elevation
+      allow delete: if isAdmin();
+    }
+
+    // 2. Wallets collection (Strict ledger security)
+    match /wallets/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      // Initial creation on user signup
+      allow create: if isOwner(userId) &&
+        request.resource.data.userId == userId &&
+        request.resource.data.mainBalance == 0 &&
+        request.resource.data.bonusBalance == 250 && // Auto Welcome Bonus
+        request.resource.data.welcomeBonusClaimed == true;
+      // Balance updates strictly restricted to backend or admin
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.userId == userId &&
+        // Users can only update non-balance metadata or claim welcome bonus once
+        (!resource.data.welcomeBonusClaimed && request.resource.data.welcomeBonusClaimed == true && request.resource.data.bonusBalance == 250)
+      );
+      allow delete: if false;
+    }
+
+    // 3. Transactions collection
+    match /transactions/{transactionId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow update, delete: if false; // Immutable ledger
+    }
+
+    // 4. Withdrawal Requests collection
+    match /withdrawalRequests/{requestId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn();
+      // User can submit a new Pending withdrawal request
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'Pending' &&
+        request.resource.data.amount >= 100 &&
+        request.resource.data.amount <= 50000;
+      // Status progression (Approved, Rejected, Completed) is strictly restricted to Admins
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 5. Deposit Requests collection (Personal Telebirr deposits)
+    match /depositRequests/{depositId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn();
+      // User can submit a new Pending deposit proof
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'Pending' &&
+        request.resource.data.amount >= 10 &&
+        request.resource.data.amount <= 100000;
+      // Admin approves or rejects deposits
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 6. Audit Logs collection (Restricted to Admins)
+    match /auditLogs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+  }
+}
